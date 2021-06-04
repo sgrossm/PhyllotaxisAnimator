@@ -36,13 +36,16 @@ let textStrokeSaturation, textStrokeBrightness;
 // Buttons
 let playButton, pauseButton, restartButton, resetButton;
 
-// Checkboxes
-let enableStrokeCheckbox, randomizeStrokeCheckbox; 
-let randomizeColorCheckbox, randomizeAngleCheckbox; 
+// Checkboxes - set global value?
+let randomizeStrokeCheckbox; 
+let randomizeColorCheckbox;
 
+// Dropdown
+let selectShape, enableSquare, enableTri;
+let enableEllipse = true;
  
 // UI
- 
+var canvas, drawingHeight, UIRefWidth, UIRefHeight;
 let img;
 
 
@@ -54,7 +57,8 @@ let img;
 const sketch = new p5( (drawing) => {
 	
 	drawing.setup = () => {
-		let canvas = drawing.createCanvas(drawing.windowWidth * 0.75, drawing.windowHeight * 0.75);	
+		canvas = drawing.createCanvas(drawing.windowWidth * 0.75, drawing.windowHeight * 0.75);	
+		drawingHeight = drawing.windowHeight * 0.75;
 		canvas.parent("sketch");
 		canvas.center("horizontal");
 		drawing.angleMode(drawing.DEGREES);
@@ -70,6 +74,7 @@ const sketch = new p5( (drawing) => {
 	}; */
 	
 	drawing.draw = () => {
+		const startTime = performance.now();
 		drawing.translate(drawing.width / 2, drawing.height / 2);
 		
 		stepSize = stepSlider.value(); 
@@ -115,6 +120,8 @@ const sketch = new p5( (drawing) => {
 			
 			if (enableStrokeChecked) {
 				
+
+				
 				if (randomizeStrokeChecked) {
 					drawing.stroke(shift % 256, strokeSaturation, strokeBrightness);
 					drawing.strokeWeight(strokeWidth);
@@ -131,70 +138,27 @@ const sketch = new p5( (drawing) => {
 				drawing.noStroke();
 			}
 			
+			//if (x < canvas.windowWidth || y < canvas.windowHeight) {}
+			if (enableEllipse)
+				drawing.ellipse(x, y, nodeX, nodeY); 
 			
-			drawing.ellipse(x, y, nodeX, nodeY); 
+			if (enableSquare)
+				drawing.rect(x, y, nodeX, nodeY);
 			
-			//drawing.rect(x, y, nodeX, nodeY);
-			
-			//drawing.triangle(x, y, x + nodeX, y + nodeY, x + (nodeX * 2), y) 
-			
-			//img.resize()
-			//drawing.image(img, x - 100, y - 100);
+			if (enableTri)
+				drawing.triangle(x, y, x + nodeX, y + nodeY, x + (nodeX * 2), y) 
+			 
+			/* img.resize(120, 120);
+			drawing.image(img, x - 80, y - 80); */
 			
 		}
-		
-		// Text .concat(var.toFixed()) to show values
-		textBgHue = drawing.createP('BG Hue');
-		textBgHue.style("color", "#000000");
-		textBgHue.position(105, 848);
-		
-		textBgSaturation = drawing.createP('BG Saturation');
-		textBgSaturation.style('color', "#000000");
-		textBgSaturation.position(355, 848);
-		
-		textBgBrightness = drawing.createP('BG Brightness');//.concat(bgBrightness.toFixed())
-		textBgBrightness.style('color', '#000000');
-		textBgBrightness.position(605, 848);
-		
-		textGrStep = drawing.createP('Angle rotation'); //.concat(grStep.toFixed())
-		textGrStep.style("color", "#000000");
-		textGrStep.position(105, 873);
-		
-		textC = drawing.createP('Radius'); //.concat(c.toFixed())
-		textC.style("color", "#000000");
-		textC.position(605, 873);
-		
-		textStep = drawing.createP('Step Size'); //.concat(stepSize.toFixed())
-		textStep.style('color', '#000000');
-		textStep.position(105, 922);
-		
-		textnodeX = drawing.createP('X Size'); //.concat(nodeX.toFixed())
-		textnodeX.style('color', '#000000');
-		textnodeX.position(355, 922);		
-
-		textnodeY = drawing.createP('Y Size'); //.concat(nodeY.toFixed())
-		textnodeY.style('color', '#000000');
-		textnodeY.position(605, 922);
-		
-		textColorHue = drawing.createP('Node Hue'); //.concat(colorShift.toFixed())
-		textColorHue.style('color', "#000000");
-		textColorHue.position(105, 898);
-		
-		textColorSaturation = drawing.createP('Node Saturation'); //.concat(colorSaturation.toFixed())
-		textColorSaturation.style('color', '#000000');
-		textColorSaturation.position(355, 898);
-		
-		textColorBrightness = drawing.createP("Node Brightness"); //.concat(colorBrightness.toFixed())
-		textColorBrightness.style('color', '#000000');
-		textColorBrightness.position(605, 898);
-		
-		textLoopSpeed = drawing.createP('Loop Speed'); //.concat(loopSpeed.toFixed())
-		textLoopSpeed.style('color', '#000000');
-		textLoopSpeed.position(355, 873);
 		
 		n += loopSpeed;
 		s += 5;
 		gr += grStep;
+		
+		const duration = performance.now() - startTime;
+		console.log(`drawing took: ${duration}ms`);
 	};
 	
 });
@@ -203,11 +167,17 @@ const sketch = new p5( (drawing) => {
 const ui = new p5( (menu) => {
 	
 	menu.setup = () => {
-		menu.createCanvas(menu.windowWidth * 0.75, menu.windowHeight * 0.25);
+		let r = menu.createCanvas(menu.windowWidth * 0.75, menu.windowHeight * 0.25);
+		//r.parent("sketch");
 		
-		createMainButtons(menu);
-		createCheckBoxes(menu);
-		createSliders(menu);
+		r.position(canvas.position().x, drawingHeight + canvas.position().y);
+		UIRefWidth = canvas.position().x
+		UIRefHeight = drawingHeight + canvas.position().y;
+		createMainButtons(menu, UIRefHeight, UIRefWidth);
+		createCheckBoxes(menu, UIRefHeight, UIRefWidth);
+		createSliders(menu, UIRefHeight, UIRefWidth);
+		drawText(menu, UIRefHeight, UIRefWidth);
+		createDropdown(menu, UIRefHeight, UIRefWidth);
 	};
 	
 	menu.windowResized = () => {
@@ -220,120 +190,214 @@ const ui = new p5( (menu) => {
 });
 
 
-function createMainButtons(draw) {
+function createMainButtons(draw, h, w) {
 	// Main Buttons 
 	resetButton = draw.createButton("Reset");
-	resetButton.position(540, 812);
+	resetButton.position(w + 350, h);
 	resetButton.mousePressed(resetCanvas);
 	
 	playButton = draw.createButton("Play");
-	playButton.position(600, 812);
+	playButton.position(w + 400, h);
 	playButton.mousePressed(playDrawing, draw);
 	
 	pauseButton = draw.createButton("Pause");
-	pauseButton.position(650, 812);
+	pauseButton.position(w + 440, h);
 	pauseButton.mousePressed(pauseDrawing, draw);
 	
 	restartButton = draw.createButton("Restart");
-	restartButton.position(712, 812);
+	restartButton.position(w + 490, h);
 	restartButton.mousePressed(restartDrawing, draw);	
 }
 
-function createCheckBoxes(draw) {
-	enableStrokeCheckbox = draw.createCheckbox('Outline', true);
-	enableStrokeCheckbox.position(0, 800);
-	enableStrokeCheckbox.changed(enableStrokeEvent);
+function createCheckBoxes(draw, h, w) {
 	
-	randomizeStrokeCheckbox = draw.createCheckbox('Randomize Outline', false);
-	randomizeStrokeCheckbox.position(0, 825);
+	randomizeStrokeCheckbox = draw.createCheckbox('Random Outline', false);
+	randomizeStrokeCheckbox.position(w + 200, h);
 	randomizeStrokeCheckbox.changed(enableRandomizeStrokeColorEvent);
 	
-	randomizeColorCheckbox = draw.createCheckbox('Randomize Color', false);
-	randomizeColorCheckbox.position(250, 800);
+	randomizeColorCheckbox = draw.createCheckbox('Random Color', false);
+	randomizeColorCheckbox.position(w + 80, h);
 	randomizeColorCheckbox.changed(enableRandomizeColorEvent);
 	
-	randomizeAngleCheckbox = draw.createCheckbox('Randomize Angle', false);
-	randomizeAngleCheckbox.position(250, 825);
-	//randomizeAngleCheckbox.changed()
 }
 
-function createSliders(draw) {
+function createDropdown(draw, h, w)
+{
+	selectShape = draw.createSelect();
+	selectShape.position(w, h);
+	selectShape.option("ellipse");
+	selectShape.option("square");
+	selectShape.option("triangle");
+	selectShape.selected("ellipse");
+	selectShape.changed(selectShapeEvent);
+}
+
+function createSliders(draw, h, w) {
  	bgHueSlider = draw.createSlider(0, 360, 0, 0);
 	bgHueSlider.style('width', '100px');
-	bgHueSlider.position(0, 850);
+	bgHueSlider.position(w, h + 35);
 	
 	bgSaturationSlider = draw.createSlider(0, 100, 0, 0);
 	bgSaturationSlider.style('width', '100px');
-	bgSaturationSlider.position(250, 850); 
+	bgSaturationSlider.position(w + 170, h + 35); 
 	
 	bgBrightnessSlider = draw.createSlider(0, 100, 0, 0);
 	bgBrightnessSlider.style('width', '100px');
-	bgBrightnessSlider.position(500, 850); 
+	bgBrightnessSlider.position(w + 373, h + 35); 
 	
-	grStepSlider = draw.createSlider(0, .5, 0.005, 0);
+	grStepSlider = draw.createSlider(-0.005, 0.005, 0.0015, 0);
 	grStepSlider.style('width', '100px');
-	grStepSlider.position(0, 875);
+	grStepSlider.position(w, h + 57);
 	
-	cSlider = draw.createSlider(0, 100, 10, 0);
+	cSlider = draw.createSlider(1, 200, 10, 0);
 	cSlider.style('width', '100px');
-	cSlider.position(500, 875);
+	cSlider.position(w + 170, h + 57);
 
 	stepSlider = draw.createSlider(0.05, 4, 2, 0);
 	stepSlider.style('width', '100px');
-	stepSlider.position(0, 925);
-	
-	nodeXSlider = draw.createSlider(1, 100, 25, 0);
-	nodeXSlider.style('width', '100px');
-	nodeXSlider.position(250, 925);
-	
-	nodeYSlider = draw.createSlider(1, 100, 25, 0);
-	nodeYSlider.style('width', '100px');
-	nodeYSlider.position(500, 925);
+	stepSlider.position(w + 373, h + 57);
 	
 	colorHueSlider = draw.createSlider(0, 360, 200, 0);
 	colorHueSlider.style('width', '100px');
-	colorHueSlider.position(0, 900);
+	colorHueSlider.position(w, h + 81);
 	
 	colorSaturationSlider = draw.createSlider(0, 255, 255, 0);
 	colorSaturationSlider.style('width', '100px');
-	colorSaturationSlider.position(250, 900);
+	colorSaturationSlider.position(w + 170, h + 81);
 
 	colorBrightnessSlider = draw.createSlider(0, 100, 100, 0);
 	colorBrightnessSlider.style('width', '100px');
-	colorBrightnessSlider.position(500, 900);
-	
+	colorBrightnessSlider.position(w + 373, h + 81);	
+
 	loopSpeedSlider = draw.createSlider(0.5, 100, 2, 0);
 	loopSpeedSlider.style('width', '100px');
-	loopSpeedSlider.position(250, 875);
+	loopSpeedSlider.position(w, h + 102);
+
+	nodeXSlider = draw.createSlider(1, 200, 25, 0);
+	nodeXSlider.style('width', '100px');
+	nodeXSlider.position(w + 170, h + 102);
+	
+	nodeYSlider = draw.createSlider(1, 200, 25, 0);
+	nodeYSlider.style('width', '100px');
+	nodeYSlider.position(w + 373, h + 102);
 	
 	strokeHueSlider = draw.createSlider(0, 360, 0, 0);
 	strokeHueSlider.style('width', '100px');
-	strokeHueSlider.position(0, 950);
+	strokeHueSlider.position(w, h + 124);
 	
-	strokeSaturationSlider = draw.createSlider(0, 255, 0, 0);
+	strokeSaturationSlider = draw.createSlider(0, 255, 255, 0);
 	strokeSaturationSlider.style('width', '100px');
-	strokeSaturationSlider.position(250, 950);
+	strokeSaturationSlider.position(w + 170, h + 124);
 	
 	strokeBrightnessSlider = draw.createSlider(0, 100, 100, 0);
 	strokeBrightnessSlider.style('width', '100px');
-	strokeBrightnessSlider.position(500, 950);
+	strokeBrightnessSlider.position(w + 373, h + 124);
 	
-	strokeWidthSlider = draw.createSlider(0.5, 20, 1, 0);
+	strokeWidthSlider = draw.createSlider(0, 20, 1, 0);
 	strokeWidthSlider.style('width', '100px');
-	strokeWidthSlider.position(0, 975);
+	strokeWidthSlider.position(w, h + 146);
 }
- 
 
-function enableStrokeEvent()
+function drawText(draw, h, w)
 {
-	if (this.checked) {
-		enableStrokeChecked = true;
-	}
+	// Text .concat(var.toFixed()) to show values
+	textBgHue = draw.createP('BG Hue');
+	textBgHue.style("color", "#000000");
+	textBgHue.position(w + 102, h + 33); 
+
+	textBgSaturation = draw.createP('BG Saturation');
+	textBgSaturation.style('color', "#000000");
+	textBgSaturation.position(w + 273, h + 33);
+
+	textBgBrightness = draw.createP('BG Brightness');//.concat(bgBrightness.toFixed())
+	textBgBrightness.style('color', '#000000');
+	textBgBrightness.position(w + 475, h + 33);
+
+	textGrStep = draw.createP('Rotation'); //.concat(grStep.toFixed())
+	textGrStep.style("color", "#000000");
+	textGrStep.position(w + 102, h + 55);
+
+	textC = draw.createP('Radius'); //.concat(c.toFixed())
+	textC.style("color", "#000000");
+	textC.position(w + 273, h + 55);
+
+	textStep = draw.createP('Angle'); //.concat(stepSize.toFixed())
+	textStep.style('color', '#000000');
+	textStep.position(w + 475, h + 55);
 	
-	else {
-		enableStrokeChecked = false;
+	textColorHue = draw.createP('Node Hue'); //.concat(colorShift.toFixed())
+	textColorHue.style('color', "#000000");
+	textColorHue.position(w + 102, h + 77);
+
+	textColorSaturation = draw.createP('Node Saturation'); //.concat(colorSaturation.toFixed())
+	textColorSaturation.style('color', '#000000');
+	textColorSaturation.position(w + 273, h + 77);
+
+	textColorBrightness = draw.createP("Node Brightness"); //.concat(colorBrightness.toFixed())
+	textColorBrightness.style('color', '#000000');
+	textColorBrightness.position(w + 475, h + 77);
+
+	textLoopSpeed = draw.createP('Speed'); //.concat(loopSpeed.toFixed())
+	textLoopSpeed.style('color', '#000000');
+	textLoopSpeed.position(w + 102, h + 100);
+
+	textnodeX = draw.createP('X Size'); //.concat(nodeX.toFixed())
+	textnodeX.style('color', '#000000');
+	textnodeX.position(w + 273, h + 100);		
+
+	textnodeY = draw.createP('Y Size'); //.concat(nodeY.toFixed())
+	textnodeY.style('color', '#000000');
+	textnodeY.position(w + 475, h + 100);
+
+	textStrokeHue = draw.createP('Line Hue');
+	textStrokeHue.style('color', '#000000');
+	textStrokeHue.position(w + 102, h + 122);
+	
+	textStrokeSaturation = draw.createP('Line Saturation');
+	textStrokeSaturation.style('color', "#000000");
+	textStrokeSaturation.position(w + 273, h + 122);
+	
+	textStrokeBrightness = draw.createP('Line Brightness');
+	textStrokeBrightness.style('color', "#000000");
+	textStrokeBrightness.position(w + 475, h + 122);
+	
+	textStrokeWidth = draw.createP('Line Width');	
+	textStrokeWidth.style('color', '#000000');
+	textStrokeWidth.position(w + 102, h + 143)
+}
+
+function selectShapeEvent()
+{
+	//enableEllipse, enableSquare, enableTri
+	let val = selectShape.value();
+	console.log(val);
+	switch (val) {
+		case "ellipse":
+			enableEllipse = true;
+			enableSquare = false;
+			enableTri = false;
+			break;
+		
+		case "square":
+			enableSquare = true;
+			enableEllipse = false;
+			enableTri = false;
+			break;
+			
+		case "triangle":
+			enableTri = true;
+			enableEllipse = false;
+			enableSquare = false;
+			break;
+		
+		default: 
+			enableEllipse = true;
+			enableSquare = false;
+			enableTri = false;
+			break;
 	}
 }
+
 
 function enableRandomizeColorEvent()
 {
