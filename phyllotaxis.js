@@ -45,7 +45,7 @@ let selectShape, enableSquare, enableTri;
 let enableEllipse = true;
  
 // UI
-var canvas, drawingHeight, UIRefWidth, UIRefHeight;
+var canvas, drawingHeight, UIRefWidth, UIRefHeight, r;
 let img;
 
 
@@ -158,7 +158,7 @@ const sketch = new p5( (drawing) => {
 		gr += grStep;
 		
 		const duration = performance.now() - startTime;
-		console.log(`drawing took: ${duration}ms`);
+		//console.log(`drawing took: ${duration}ms`);
 	};
 	
 });
@@ -167,12 +167,13 @@ const sketch = new p5( (drawing) => {
 const ui = new p5( (menu) => {
 	
 	menu.setup = () => {
-		let r = menu.createCanvas(menu.windowWidth * 0.75, menu.windowHeight * 0.25);
-		//r.parent("sketch");
-		
+		r = menu.createCanvas(menu.windowWidth * 0.75, menu.windowHeight * 0.25);
+		//r.parent("sketch");		
 		r.position(canvas.position().x, drawingHeight + canvas.position().y);
-		UIRefWidth = canvas.position().x
+				
+		UIRefWidth = canvas.position().x + 10;
 		UIRefHeight = drawingHeight + canvas.position().y;
+
 		createMainButtons(menu, UIRefHeight, UIRefWidth);
 		createCheckBoxes(menu, UIRefHeight, UIRefWidth);
 		createSliders(menu, UIRefHeight, UIRefWidth);
@@ -182,6 +183,15 @@ const ui = new p5( (menu) => {
 	
 	menu.windowResized = () => {
 		menu.resizeCanvas(menu.windowWidth * 0.75, menu.windowHeight * 0.25);
+		
+		UIRefWidth = canvas.position().x + 10;
+		UIRefHeight = drawingHeight + canvas.position().y;
+		menu.clear();
+		createMainButtons(menu, UIRefHeight, UIRefWidth);
+		createCheckBoxes(menu, UIRefHeight, UIRefWidth);
+		createSliders(menu, UIRefHeight, UIRefWidth);
+		drawText(menu, UIRefHeight, UIRefWidth);
+		createDropdown(menu, UIRefHeight, UIRefWidth);
 	};
 	
 	menu.draw = () => {
