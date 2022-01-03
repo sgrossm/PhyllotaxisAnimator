@@ -1,7 +1,9 @@
 //////////  SEIZURE WARNING  //////////
 ////////// START phyllotaxis //////////
 
-
+/*
+		TODO: Split these variables into globals.js 
+*/
 // Checkbox Values
 var enableStrokeChecked = true;
 var randomizeStrokeChecked;
@@ -19,7 +21,7 @@ let strokeSaturation, strokeBrightness;
 
 // Sliders
 let bgHueSlider, bgSaturationSlider, bgBrightnessSlider; 
-let grSlider, cSlider, stepSlider, loopSpeedSlider;
+let cSlider, stepSlider, loopSpeedSlider;
 let nodeXSlider, nodeYSlider, colorHueSlider;
 let colorSaturationSlider, colorBrightnessSlider;
 let strokeHueSlider, strokeSaturationSlider, strokeBrightnessSlider;
@@ -39,23 +41,39 @@ let playButton, pauseButton, restartButton, resetButton;
 // Checkboxes - set global value?
 let randomizeStrokeCheckbox; 
 let randomizeColorCheckbox;
+let muteAudio;
 
 // Dropdown
 let selectShape, enableSquare, enableTri;
 let enableEllipse = true;
  
 // UI
-var canvas, drawingHeight, UIRefWidth, UIRefHeight, r;
-let img;
-
-
-/* ***************** NEED TWO SEPARATE CANVASES:
-						1) Handle the drawing
-						2) UI
- ********************/
+var canvas, drawingHeight, UIRefWidth, UIRefHeight, UIBox;
+var resizeUIWidth, resizeUIHeight;
+let img;	// Let users upload Image? // how do sound parameters affect sound?
  
+// Both image preload and audio preload need to run server: 'python -m http.server'
+
+// How graphics map to arpeggiator 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
+//  
+//	Shape: 				osc type 
+//	Angle:				scale type
+//  Background color:	reverb/delay
+//  Node color:			starting pitch	
+//  Outline color:		filter attack
+//	Outline width: 		osc attack
+//	Radius:				filter cutoff
+//  Rotation: 			arp direction (up/down)
+//	Speed:				arp speed
+//  Node Size:			osc decay
+//  
+//	Randomize Color:	random scale
+//	Randomize Outline: 	random filter position
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 const sketch = new p5( (drawing) => {
-	
 	drawing.setup = () => {
 		canvas = drawing.createCanvas(drawing.windowWidth * 0.75, drawing.windowHeight * 0.75);	
 		drawingHeight = drawing.windowHeight * 0.75;
@@ -74,7 +92,7 @@ const sketch = new p5( (drawing) => {
 	}; */
 	
 	drawing.draw = () => {
-		const startTime = performance.now();
+		
 		drawing.translate(drawing.width / 2, drawing.height / 2);
 		
 		stepSize = stepSlider.value(); 
@@ -89,21 +107,29 @@ const sketch = new p5( (drawing) => {
 		colorBrightness = colorBrightnessSlider.value();
 		loopSpeed = loopSpeedSlider.value();
 		grStep = grStepSlider.value();
-
 		strokeHue = strokeHueSlider.value();
 		strokeSaturation = strokeSaturationSlider.value();
 		strokeBrightness = strokeBrightnessSlider.value();
 		strokeWidth = strokeWidthSlider.value();
 		
+		//const startTime = performance.now();
 		for (var i = 0; i <= n; i += stepSize)
-		{		
-			//gr = grSlider.value();
+		{
 			c = cSlider.value();
 			
 			var angle = i * gr;
 			var r = c * drawing.sqrt(i);
 			var x = r * drawing.cos(angle);
 			var y = r * drawing.sin(angle);
+			
+			// Break out of loop if values fall outside canvas 
+			// does this optimize anything???
+/* 			if (Math.abs(x) > Math.abs(drawing.width) && Math.abs(y) > Math.abs(drawing.height)) {
+				console.log("outside screen");
+				break;
+			} */
+				
+			// experiment with this for more randomization options
 			var shift = drawing.cos(s + i * 0.5);
 			shift = drawing.map(shift, -1, 1, 0, 360);
 			
@@ -120,8 +146,6 @@ const sketch = new p5( (drawing) => {
 			
 			if (enableStrokeChecked) {
 				
-
-				
 				if (randomizeStrokeChecked) {
 					drawing.stroke(shift % 256, strokeSaturation, strokeBrightness);
 					drawing.strokeWeight(strokeWidth);
@@ -132,32 +156,38 @@ const sketch = new p5( (drawing) => {
 					drawing.strokeWeight(strokeWidth);
 				}
 				
-			}
+			}	
 			
 			else {
 				drawing.noStroke();
 			}
+
+ 			if (Math.abs(x) < Math.abs(drawing.width) && Math.abs(y) < Math.abs(drawing.height)) {
+				if (enableEllipse)
+					drawing.ellipse(x, y, nodeX, nodeY); 
+				
+				if (enableSquare)
+					drawing.rect(x, y, nodeX, nodeY);
+				
+				if (enableTri)
+					drawing.triangle(x, y, x + nodeX, y + nodeY, x + (nodeX * 2), y) 				
+				
+			}
 			
-			//if (x < canvas.windowWidth || y < canvas.windowHeight) {}
-			if (enableEllipse)
-				drawing.ellipse(x, y, nodeX, nodeY); 
-			
-			if (enableSquare)
-				drawing.rect(x, y, nodeX, nodeY);
-			
-			if (enableTri)
-				drawing.triangle(x, y, x + nodeX, y + nodeY, x + (nodeX * 2), y) 
-			 
-			/* img.resize(120, 120);
-			drawing.image(img, x - 80, y - 80); */
-			
+			/*
+				 -> resizing node size should resize image
+				 -> grey out randomize checkboxes
+				 -> allow user to upload their own pictures (limit file/image size)
+			img.resize(120, 120);
+			drawing.image(img, x - 80, y - 80);
+			*/
 		}
-		
+
 		n += loopSpeed;
-		s += 5;
-		gr += grStep;
-		
-		const duration = performance.now() - startTime;
+		s += 5;				// randomize color speed
+		gr += grStep;		
+
+		//const duration = performance.now() - startTime;
 		//console.log(`drawing took: ${duration}ms`);
 	};
 	
@@ -167,29 +197,37 @@ const sketch = new p5( (drawing) => {
 const ui = new p5( (menu) => {
 	
 	menu.setup = () => {
-		r = menu.createCanvas(menu.windowWidth * 0.75, menu.windowHeight * 0.25);
+		UIBox = menu.createCanvas(menu.windowWidth * 0.75, menu.windowHeight * 0.15);
 		//r.parent("sketch");		
-		r.position(canvas.position().x, drawingHeight + canvas.position().y);
+		UIBox.position(canvas.position().x, drawingHeight + canvas.position().y);
 				
 		UIRefWidth = canvas.position().x + 10;
 		UIRefHeight = drawingHeight + canvas.position().y;
+		
+		resizeUIWidth = menu.windowWidth * 0.75;
+		resizeUIHeight = menu.windowHeight * 0.15;		
 
 		createMainButtons(menu, UIRefHeight, UIRefWidth);
 		createCheckBoxes(menu, UIRefHeight, UIRefWidth);
-		createSliders(menu, UIRefHeight, UIRefWidth);
+		createSliders(menu, UIRefHeight, UIRefWidth, resizeUIHeight, resizeUIWidth);
 		drawText(menu, UIRefHeight, UIRefWidth);
 		createDropdown(menu, UIRefHeight, UIRefWidth);
 	};
 	
 	menu.windowResized = () => {
-		menu.resizeCanvas(menu.windowWidth * 0.75, menu.windowHeight * 0.25);
+		menu.resizeCanvas(menu.windowWidth * 0.75, menu.windowHeight * 0.15);
 		
 		UIRefWidth = canvas.position().x + 10;
 		UIRefHeight = drawingHeight + canvas.position().y;
+		console.log(`UIRefWidth: ${UIRefHeight}`);
+		resizeUIWidth = menu.windowWidth * 0.75;
+		resizeUIHeight = menu.windowHeight * 0.15;	
+		console.log(`ResizeHeight: ${resizeUIHeight}`);
+		
 		menu.clear();
 		createMainButtons(menu, UIRefHeight, UIRefWidth);
 		createCheckBoxes(menu, UIRefHeight, UIRefWidth);
-		createSliders(menu, UIRefHeight, UIRefWidth);
+		createSliders(menu, UIRefHeight, UIRefWidth, resizeUIHeight, resizeUIWidth);
 		drawText(menu, UIRefHeight, UIRefWidth);
 		createDropdown(menu, UIRefHeight, UIRefWidth);
 	};
@@ -200,6 +238,10 @@ const ui = new p5( (menu) => {
 });
 
 
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
+//		HELPER FUNCTIONS																				 //
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
 function createMainButtons(draw, h, w) {
 	// Main Buttons 
 	resetButton = draw.createButton("Reset");
@@ -242,7 +284,11 @@ function createDropdown(draw, h, w)
 	selectShape.changed(selectShapeEvent);
 }
 
-function createSliders(draw, h, w) {
+function createSliders(draw, h, w, rH, rW) {
+	
+	/* console.log(`resizeW: ${rW}`);
+	console.log(`resizeH: ${rH}`); */
+	
  	bgHueSlider = draw.createSlider(0, 360, 0, 0);
 	bgHueSlider.style('width', '100px');
 	bgHueSlider.position(w, h + 35);
@@ -279,7 +325,7 @@ function createSliders(draw, h, w) {
 	colorBrightnessSlider.style('width', '100px');
 	colorBrightnessSlider.position(w + 373, h + 81);	
 
-	loopSpeedSlider = draw.createSlider(0.5, 100, 2, 0);
+	loopSpeedSlider = draw.createSlider(0.5, 100, 1, 0);
 	loopSpeedSlider.style('width', '100px');
 	loopSpeedSlider.position(w, h + 102);
 
@@ -331,7 +377,7 @@ function drawText(draw, h, w)
 	textC.style("color", "#000000");
 	textC.position(w + 273, h + 55);
 
-	textStep = draw.createP('Angle'); //.concat(stepSize.toFixed())
+	textStep = draw.createP('Angle Delta'); //.concat(stepSize.toFixed())
 	textStep.style('color', '#000000');
 	textStep.position(w + 475, h + 55);
 	
@@ -373,14 +419,14 @@ function drawText(draw, h, w)
 	
 	textStrokeWidth = draw.createP('Line Width');	
 	textStrokeWidth.style('color', '#000000');
-	textStrokeWidth.position(w + 102, h + 143)
+	textStrokeWidth.position(w + 102, h + 143);
 }
 
 function selectShapeEvent()
 {
 	//enableEllipse, enableSquare, enableTri
 	let val = selectShape.value();
-	console.log(val);
+	
 	switch (val) {
 		case "ellipse":
 			enableEllipse = true;
@@ -412,22 +458,21 @@ function selectShapeEvent()
 function enableRandomizeColorEvent()
 {
 	if (this.checked) {
-		randomizeColorChecked = true;
+		if (randomizeColorChecked)
+			randomizeColorChecked = false;
+		else
+			randomizeColorChecked = true;
 	}
 	
-	else {
-		randomizeColorChecked = false;
-	}
 }
 
 function enableRandomizeStrokeColorEvent()
 {
 	if (this.checked) {
-		randomizeStrokeChecked  = true;
-	}
-	
-	else {
-		randomizeStrokeChecked = false;
+		if (randomizeStrokeChecked)
+			randomizeStrokeChecked = false;
+		else
+			randomizeStrokeChecked  = true;
 	}
 }
 
@@ -447,9 +492,9 @@ function playDrawing(draw) {
 }
 
 function resetCanvas() {
-/* 	clear();
+/*  	clear();
 	s = 0;
-	n = 0; */
+	n = 0;  */
 	location.reload();
 }
 ////////// END phyllotaxis //////////
