@@ -4,11 +4,6 @@
 /*
 		TODO: Split these variables into globals.js 
 */
-// Checkbox Values
-var enableStrokeChecked = true;
-var randomizeStrokeChecked;
-var randomizeAngleChecked, randomizeColorChecked;
-
 // Algorithm variables
 var s = 0 
 var n = 0;
@@ -27,7 +22,6 @@ let colorSaturationSlider, colorBrightnessSlider;
 let strokeHueSlider, strokeSaturationSlider, strokeBrightnessSlider;
 let strokeWidthSlider;
 
-
 // Text 
 let textBgHue, textBgSaturation, textBgBrightness;
 let textGrStep, textC, textStep, textnodeX, textnodeY;
@@ -38,174 +32,335 @@ let textStrokeSaturation, textStrokeBrightness;
 // Buttons
 let playButton, pauseButton, restartButton, resetButton;
 
-// Checkboxes - set global value?
+// Checkboxes 
 let randomizeStrokeCheckbox; 
 let randomizeColorCheckbox;
-let muteAudio;
+let muteAudioCheckbox;
+
+// Checkbox Values
+var enableStrokeChecked = true;
+var enableMuteAudioChecked = false;
+var randomizeStrokeChecked = false;
+//var randomizeAngleChecked 
+var randomizeColorChecked = false;
 
 // Dropdown
-let selectShape, enableSquare, enableTri;
+let selectShape, enableSquare, enableTri, selectDrawDimension;
+let enable3D = false;
 let enableEllipse = true;
  
 // UI
-var canvas, drawingHeight, UIRefWidth, UIRefHeight, UIBox;
+var canvas, startButton, drawingHeight, UIRefWidth, UIRefHeight, UIBox;
 var resizeUIWidth, resizeUIHeight;
+let hasStarted = false;
 let img;	// Let users upload Image? // how do sound parameters affect sound?
- 
-// Both image preload and audio preload need to run server: 'python -m http.server'
 
+// Test
+var totalDrawCalls = 0;
+var totalShapesDrawn = 0;
+// need to cap graphics off at a certain level to avoid performance dedgradation
+
+
+// Sound - use TONE.JS
+var isPlaying = false;
+var initVol = -6;
+var maxVol = 0;
+/*
+let volumeSlider; 	 
+
+var maxFreqHz = 20000;
+var minFreqHz = 50;
+ var bpm = 120;
+var noteLength = 0.5; // default to eighth note
+var playLength = 1/(bpm/60) * noteLength; 
 // How graphics map to arpeggiator 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-//  
-//	Shape: 				osc type 
-//	Angle:				scale type
-//  Background color:	reverb/delay
-//  Node color:			starting pitch	
-//  Outline color:		filter attack
-//	Outline width: 		osc attack
-//	Radius:				filter cutoff
-//  Rotation: 			arp direction (up/down)
-//	Speed:				arp speed
-//  Node Size:			osc decay
-//  
-//	Randomize Color:	random scale
-//	Randomize Outline: 	random filter position
-//
+//  							(ADSR?) (Gate?) (Slide?) (Octave?)
+//	Shape: 						osc type 
+//	Angle:						scale type
+//  Node Hue:					filter cutoff	
+//  Node Saturation:
+//	Node Brightness:
+//  Background Color:		
+//  Background Saturation:
+//	Background Brightness:
+//  Stroke color:				filter attack
+//  Stroke Saturation:
+//	Stroke Brightness:
+//	Outline width: 				osc attack
+//	Radius:						starting octave
+//  Rotation: 					arp direction (up/down)
+//	Speed:						bpm 
+//  Node Size:					osc decay
+//  X,Y coords???				start note? 
+//	Randomize Color:			random scale
+//	Randomize Outline: 			random filter position
+//  Image?
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+*/
 
-const sketch = new p5( (drawing) => {
+// Main drawing area 
+const SketchSystem = new p5( (drawing) => {
 	drawing.setup = () => {
-		canvas = drawing.createCanvas(drawing.windowWidth * 0.75, drawing.windowHeight * 0.75);	
+		// optimize performance turn off warnings
+		p5.disableFriendlyErrors = true;
+		//img = drawing.loadImage("img/cat.png");
+		startButton = drawing.createButton("Start");
+		startButton.mousePressed(InitializeSoundSystem);
+		//img = drawing.loadImage("img/cat.png");
+/* 		if (enable3D)
+		{
+			canvas = drawing.createCanvas(drawing.windowWidth * 0.5, drawing.windowHeight * 0.75, drawing.WEBGL);
+		} */
+		// put 3D stuff in a separate sketch
+		canvas = drawing.createCanvas(drawing.windowWidth * 0.75, drawing.windowHeight * 0.75);
+		canvas.position(0, 25);
 		drawingHeight = drawing.windowHeight * 0.75;
-		canvas.parent("sketch");
+		canvas.parent("SketchSystem");
 		canvas.center("horizontal");
 		drawing.angleMode(drawing.DEGREES);
 		drawing.colorMode(drawing.HSB);
+		//draw into an off-screen graphics buffer
+		// drawing.createGraphics 
+		drawing.frameRate(30);
+		//drawing.blendMode(drawing.MULTIPLY);
+		//let d = drawing.pixelDensity();
+		//drawing.loadPixels(1);
 	};
 	
 	drawing.windowResized = ()  => {
 		drawing.resizeCanvas(drawing.windowWidth * 0.75, drawing.windowHeight* 0.75);
 	};
 	
-/* 	drawing.preload = () => {
-		img = drawing.loadImage("img/cat.png");
-	}; */
+	drawing.preload = () => {
+		//??? 
+		//img = drawing.loadImage("img/cat.png");
+	};
 	
 	drawing.draw = () => {
-		
-		drawing.translate(drawing.width / 2, drawing.height / 2);
-		
-		stepSize = stepSlider.value(); 
-		nodeX = nodeXSlider.value();
-		nodeY = nodeYSlider.value();
-		colorShift = colorHueSlider.value();
-		bgHue = bgHueSlider.value();
-		bgSaturation = bgSaturationSlider.value();
-		bgBrightness = bgBrightnessSlider.value(); 
-		drawing.background(bgHue, bgSaturation, bgBrightness);
-		colorSaturation = colorSaturationSlider.value();
-		colorBrightness = colorBrightnessSlider.value();
-		loopSpeed = loopSpeedSlider.value();
-		grStep = grStepSlider.value();
-		strokeHue = strokeHueSlider.value();
-		strokeSaturation = strokeSaturationSlider.value();
-		strokeBrightness = strokeBrightnessSlider.value();
-		strokeWidth = strokeWidthSlider.value();
-		
-		//const startTime = performance.now();
-		for (var i = 0; i <= n; i += stepSize)
-		{
-			c = cSlider.value();
+		//if (drawing.frameCount % 2 == 0)
+		//{
+			var opt = false;
+		if (hasStarted) {
+			const totalStartTime = performance.now();						
+			drawing.translate(drawing.width / 2, drawing.height / 2); // 2D
+			//drawing.translate(drawing.width / 10, drawing.height / 10); // 3D
+			drawing.background(bgHue, bgSaturation, bgBrightness);
+			//drawing.background(img);
 			
-			var angle = i * gr;
-			var r = c * drawing.sqrt(i);
-			var x = r * drawing.cos(angle);
-			var y = r * drawing.sin(angle);
-			
-			// Break out of loop if values fall outside canvas 
-			// does this optimize anything???
-/* 			if (Math.abs(x) > Math.abs(drawing.width) && Math.abs(y) > Math.abs(drawing.height)) {
-				console.log("outside screen");
-				break;
-			} */
-				
-			// experiment with this for more randomization options
-			var shift = drawing.cos(s + i * 0.5);
-			shift = drawing.map(shift, -1, 1, 0, 360);
-			
-			if (randomizeColorChecked) {
-				 
-				// Color = angle % 256or shift % colorShift
-				//fill(colorShift, colorSaturation, colorBrightness)
-				drawing.fill(shift % colorShift % 256, colorSaturation, colorBrightness);			
+			if (drawing.WEBGL)
+			{
+				// 2D coordinate origin => upper left corner
+				// 3D coordinate origin => center 
 			}
+			
+			//draw into an off-screen graphics buffer
+			// drawing.createGraphics 	
+			
+			stepSize 			= stepSlider.value(); 
+			nodeX 				= nodeXSlider.value();
+			nodeY 				= nodeYSlider.value();
+			colorShift 			= colorHueSlider.value();
+			bgHue 				= bgHueSlider.value();
+			bgSaturation 		= bgSaturationSlider.value();
+			bgBrightness 		= bgBrightnessSlider.value(); 
+			colorSaturation 	= colorSaturationSlider.value();
+			colorBrightness 	= colorBrightnessSlider.value();
+			loopSpeed 			= loopSpeedSlider.value();
+			grStep 				= grStepSlider.value();
+			strokeHue 			= strokeHueSlider.value();
+			strokeSaturation 	= strokeSaturationSlider.value();
+			strokeBrightness 	= strokeBrightnessSlider.value();
+			strokeWidth 		= strokeWidthSlider.value();
 
-			else {
-				drawing.fill(colorShift, colorSaturation, colorBrightness);
-			}
+
 			
-			if (enableStrokeChecked) {
+			/* stagger audio execution on a less frequent basis than visuals?
+			// use web workers to separate audio/visual threads? ?
+			// create list to hold previous arp notes ??
+			//var osc = AudioContext.createOscillator();
+			*/
+			if (drawing.frameCount % 5 == 0)
+			{	
+				PlaySound();
+			}		
+			
+			for (var i = 0; i <= n; i += stepSize)	// n gets really large, and I am redrawing everything
+			{	
+				// create new osc
+				//var oscNode = CreateOsc();
 				
-				if (randomizeStrokeChecked) {
-					drawing.stroke(shift % 256, strokeSaturation, strokeBrightness);
-					drawing.strokeWeight(strokeWidth);
+				c = cSlider.value();
+				
+				var angle = i * gr;
+				var r;
+				var x;
+				var y;
+				
+				let fps = drawing.frameRate();
+				// use native js if performance is bad
+				if (fps < 10)
+				{
+					r = c * drawing.sqrt(i);
+					x = r * Math.cos(angle);
+					y = r * Math.sin(angle);	
+					//totalShapesDrawn += 1;
+					let frameCount = drawing.frameCount;	
+					//console.log(`FPS: ${fps.toFixed(2)}, frame cnt: ${frameCount}`);
+					opt = true;
 				}
+					
+				else
+				{
+					r = c * drawing.sqrt(i);
+					x = r * drawing.cos(angle);
+					y = r * drawing.sin(angle);	
+					//totalShapesDrawn += 1;
+					let frameCount = drawing.frameCount;	
+					//console.log(`FPS: ${fps.toFixed(2)}, frame cnt: ${frameCount}`);
+				}
+				
+				var shift = 0;
+				// experiment with this for more randomization options
+				if (fps < 10)
+				{
+					shift = Math.cos(s + i * 0.5);
+				}
+				else
+				{
+					shift = drawing.cos(s + i * 0.5);
+				}
+				shift = drawing.map(shift, -1, 1, 0, 360);
+
+				if (randomizeColorChecked) {
+					 
+					// Color = angle % 256or shift % colorShift
+					//fill(colorShift, colorSaturation, colorBrightness)
+					drawing.fill(shift % colorShift % 256, colorSaturation, colorBrightness);			
+				}
+
+				else {
+					drawing.fill(colorShift, colorSaturation, colorBrightness);
+				}
+				
+				if (enableStrokeChecked) {
+					
+					if (randomizeStrokeChecked) {
+						drawing.stroke(shift % 256, strokeSaturation, strokeBrightness);
+						drawing.strokeWeight(strokeWidth);
+					}
+					
+					else {
+						drawing.stroke(strokeHue, strokeSaturation, strokeBrightness);
+						drawing.strokeWeight(strokeWidth);
+					}
+					
+				}	
 				
 				else {
-					drawing.stroke(strokeHue, strokeSaturation, strokeBrightness);
-					drawing.strokeWeight(strokeWidth);
+					drawing.noStroke();
+				}	
+
+				if (Math.abs(x) < Math.abs(drawing.width) || Math.abs(y) < Math.abs(drawing.height)) {
+					
+					//if (enable3D)
+					//{
+						//let dirY = (drawing.mouseY / drawing.height - 0.5) *2;
+						//let dirX = (drawing.mouseX / drawing.width - 0.5) *2;	
+						//drawing.directionalLight(250, 250, 250, dirX, -dirY, 0.25);
+						//drawing.fill(colorShift, colorSaturation, colorBrightness);
+						//drawing.pointLight(colorShift, colorSaturation, colorBrightness, x, y, 0);
+						//drawing.sphere(nodeX, 10, 10);
+						//drawing.translate(x, y);
+						//drawing.rotateY(drawing.millis() / 1000);
+						//drawing.rotateX(drawing.millis() / 1000);
+						//drawing.rotateZ(drawing.millis() / 1000);
+					//}
+					
+					if (enableEllipse)
+					{
+						
+						// lerpColor (gradient)
+						//drawing.updatePixels(x, y, 1, 1);
+						
+						drawing.ellipse(x, y, nodeX, nodeY);
+						//totalDrawCalls += 1;
+
+						/*						
+						osc.type = 'sine';
+						osc.frequency.setValueAtTime(440, AudioContext.currentTime);
+						osc.connect(AudioContext.destination);
+						osc.start(); 
+						*/
+					}
+					
+					if (enableSquare)
+					{
+						drawing.rect(x, y, nodeX, nodeY);
+					}
+					
+					if (enableTri)
+					{
+						drawing.triangle(x, y, x + nodeX, y + nodeY, x + (nodeX * 2), y);
+					}
 				}
 				
-			}	
-			
-			else {
-				drawing.noStroke();
-			}
+				else
+				{
+					//console.log("Did I make it here?");
+					continue;
+				}
+								
 
- 			if (Math.abs(x) < Math.abs(drawing.width) && Math.abs(y) < Math.abs(drawing.height)) {
-				if (enableEllipse)
-					drawing.ellipse(x, y, nodeX, nodeY); 
+				/*
+					 -> resizing node size should resize image
+					 -> grey out randomize checkboxes when image enabled
+					 -> allow user to upload their own pictures? (limit file/image size)
 				
-				if (enableSquare)
-					drawing.rect(x, y, nodeX, nodeY);
+				*/
 				
-				if (enableTri)
-					drawing.triangle(x, y, x + nodeX, y + nodeY, x + (nodeX * 2), y) 				
+				//img.resize(100, 100);
+				//drawing.image(img, x - 80, y - 80);
+				//drawing.blend(img, x - 80, y - 80, 120, 120, x, y, 120, 120, DIFFERENCE);
 				
 			}
 			
-			/*
-				 -> resizing node size should resize image
-				 -> grey out randomize checkboxes
-				 -> allow user to upload their own pictures (limit file/image size)
-			img.resize(120, 120);
-			drawing.image(img, x - 80, y - 80);
-			*/
+			n += loopSpeed;
+			s += 5;				// randomize color speed
+			gr += grStep;		// add button to turn off rotation
+			
+			//Testing
+			//totalDrawCount += 1;
+			//console.log(`n: ${n}, totalDrawCalls: ${totalDrawCalls}`);
+			const totalDuration = performance.now() - totalStartTime;
+			if (opt)
+			{
+				console.log(`Total drawing took: ${totalDuration}ms`);
+			}
+			//}
 		}
-
-		n += loopSpeed;
-		s += 5;				// randomize color speed
-		gr += grStep;		
-
-		//const duration = performance.now() - startTime;
-		//console.log(`drawing took: ${duration}ms`);
 	};
 	
 });
 
 // Handle the UI
-const ui = new p5( (menu) => {
+const UISystem = new p5( (menu) => {
 	
 	menu.setup = () => {
-		UIBox = menu.createCanvas(menu.windowWidth * 0.75, menu.windowHeight * 0.15);
-		//r.parent("sketch");		
+		// optimize performance turn off warnings
+		p5.disableFriendlyErrors = true;
+		UIBox = menu.createCanvas(menu.windowWidth * 0.5, menu.windowHeight * 0.25);
+		//r.parent("SketchSystem");		
 		UIBox.position(canvas.position().x, drawingHeight + canvas.position().y);
 				
 		UIRefWidth = canvas.position().x + 10;
 		UIRefHeight = drawingHeight + canvas.position().y;
 		
-		resizeUIWidth = menu.windowWidth * 0.75;
-		resizeUIHeight = menu.windowHeight * 0.15;		
+		resizeUIWidth = menu.windowWidth * 0.5;
+		resizeUIHeight = menu.windowHeight * 0.25;		
+
+		// In drawText use Text() to create slider names
+		// will allow me to set textSize()?
 
 		createMainButtons(menu, UIRefHeight, UIRefWidth);
 		createCheckBoxes(menu, UIRefHeight, UIRefWidth);
@@ -215,14 +370,15 @@ const ui = new p5( (menu) => {
 	};
 	
 	menu.windowResized = () => {
-		menu.resizeCanvas(menu.windowWidth * 0.75, menu.windowHeight * 0.15);
+		menu.resizeCanvas(menu.windowWidth * 0.5, menu.windowHeight * 0.25);
 		
 		UIRefWidth = canvas.position().x + 10;
 		UIRefHeight = drawingHeight + canvas.position().y;
-		console.log(`UIRefWidth: ${UIRefHeight}`);
-		resizeUIWidth = menu.windowWidth * 0.75;
-		resizeUIHeight = menu.windowHeight * 0.15;	
-		console.log(`ResizeHeight: ${resizeUIHeight}`);
+		
+		//console.log(`UIRefWidth: ${UIRefHeight}`);
+		resizeUIWidth = menu.windowWidth * 0.5;
+		resizeUIHeight = menu.windowHeight * 0.25;	
+		//console.log(`ResizeHeight: ${resizeUIHeight}`);
 		
 		menu.clear();
 		createMainButtons(menu, UIRefHeight, UIRefWidth);
@@ -233,14 +389,79 @@ const ui = new p5( (menu) => {
 	};
 	
 	menu.draw = () => {
-		menu.background(200);
+		menu.background(200);		
 	};
 });
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DRAWING HELPER FUNCTIONS
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-//		HELPER FUNCTIONS																				 //
+//		AUDIO HELPER FUNCTIONS																				 //
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
+function InitializeSoundSystem()
+{
+	hasStarted 		= true;
+	isPlaying 		= true;
+	// set volume and default params
+	
+	Tone.start();
+}
+
+function PlaySound()
+{
+	// readFile 
+	var audioData = JSON.parse(data)
+	//audioData.major[2];
+	var cacheLoopSpeed = loopSpeed;
+	const osc = new Tone.Oscillator();
+	// set osc type
+	if (enableEllipse)
+	{
+		osc.type = "sine1";
+	}
+	
+	else if (enableSquare)
+	{
+		osc.type = "square1";
+	}
+	
+	else if (enableTri)
+	{
+		osc.type = "triangle1";
+	}
+	
+	// else if sawtooth?
+	
+	// get note sequence
+	// c-> starting octave
+
+	synth = new Tone.Synth().toDestination();
+	synth.volume.value = initVol;
+	if (!enableMuteAudioChecked)
+	{	
+		const pattern = new Tone.Pattern((time, note) => {
+			synth.triggerAttackRelease(note, "4n");
+		}, ["C2", "D4", "E5", "A6"], "upDown");
+		pattern.interval = "8n";
+		pattern.loop = true;
+		
+		Tone.Transport.start();
+		pattern.start(0);
+/* 		console.log(`speed ${loopSpeed}`);
+		if (cacheLoopSpeed != loopSpeed)
+		{
+			Tone.Transport.bpm.rampTo(loopSpeed, 1);
+		}
+		synth.triggerAttackRelease("C4", "8n"); */
+	}
+	
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
+//		UI HELPER FUNCTIONS																				 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 function createMainButtons(draw, h, w) {
 	// Main Buttons 
@@ -250,15 +471,15 @@ function createMainButtons(draw, h, w) {
 	
 	playButton = draw.createButton("Play");
 	playButton.position(w + 400, h);
-	playButton.mousePressed(playDrawing, draw);
+	playButton.mousePressed(function() {playDrawing(draw);});
 	
 	pauseButton = draw.createButton("Pause");
 	pauseButton.position(w + 440, h);
-	pauseButton.mousePressed(pauseDrawing, draw);
+	pauseButton.mousePressed(function() {pauseDrawing(draw);});
 	
 	restartButton = draw.createButton("Restart");
 	restartButton.position(w + 490, h);
-	restartButton.mousePressed(restartDrawing, draw);	
+	restartButton.mousePressed(function() {restartDrawing(draw);});	
 }
 
 function createCheckBoxes(draw, h, w) {
@@ -271,6 +492,9 @@ function createCheckBoxes(draw, h, w) {
 	randomizeColorCheckbox.position(w + 80, h);
 	randomizeColorCheckbox.changed(enableRandomizeColorEvent);
 	
+	muteAudioCheckbox = draw.createCheckbox('Mute Audio', false);
+	muteAudioCheckbox.position(w + 600, h );
+	muteAudioCheckbox.changed(enableMuteAudioEvent);
 }
 
 function createDropdown(draw, h, w)
@@ -282,6 +506,27 @@ function createDropdown(draw, h, w)
 	selectShape.option("triangle");
 	selectShape.selected("ellipse");
 	selectShape.changed(selectShapeEvent);
+	
+/* 	selectDrawDimension = draw.createSelect();
+	selectDrawDimension.position(w, h + 180);
+	selectDrawDimension.option("2D");
+	selectDrawDimension.option("3D");
+	selectDrawDimension.changed(function() {
+		let val = selectShape.value();
+		console.log("Is this called?");
+		switch (val) {
+			case "2D":
+				enable3D = false;
+				break;
+			case "3D":
+				enable3D = true;
+				break;
+			default:
+				enable3D = false;
+				break;
+		}
+		draw.setup();
+	}); */
 }
 
 function createSliders(draw, h, w, rH, rW) {
@@ -325,7 +570,7 @@ function createSliders(draw, h, w, rH, rW) {
 	colorBrightnessSlider.style('width', '100px');
 	colorBrightnessSlider.position(w + 373, h + 81);	
 
-	loopSpeedSlider = draw.createSlider(0.5, 100, 1, 0);
+	loopSpeedSlider = draw.createSlider(0.001, 100, 0.5, 0);
 	loopSpeedSlider.style('width', '100px');
 	loopSpeedSlider.position(w, h + 102);
 
@@ -357,7 +602,7 @@ function createSliders(draw, h, w, rH, rW) {
 function drawText(draw, h, w)
 {
 	// Text .concat(var.toFixed()) to show values
-	textBgHue = draw.createP('BG Hue');
+	textBgHue = draw.createP("BG Hue"); //.concat(bgHue.toFixed(2)); 
 	textBgHue.style("color", "#000000");
 	textBgHue.position(w + 102, h + 33); 
 
@@ -429,31 +674,30 @@ function selectShapeEvent()
 	
 	switch (val) {
 		case "ellipse":
-			enableEllipse = true;
-			enableSquare = false;
-			enableTri = false;
+			enableEllipse 	= true;
+			enableSquare 	= false;
+			enableTri 		= false;
 			break;
 		
 		case "square":
-			enableSquare = true;
-			enableEllipse = false;
-			enableTri = false;
+			enableSquare 	= true;
+			enableEllipse 	= false;
+			enableTri 		= false;
 			break;
 			
 		case "triangle":
-			enableTri = true;
-			enableEllipse = false;
-			enableSquare = false;
+			enableTri 		= true;
+			enableEllipse 	= false;
+			enableSquare	= false;
 			break;
 		
 		default: 
-			enableEllipse = true;
-			enableSquare = false;
-			enableTri = false;
+			enableEllipse 	= true;
+			enableSquare 	= false;
+			enableTri 		= false;
 			break;
 	}
 }
-
 
 function enableRandomizeColorEvent()
 {
@@ -476,19 +720,38 @@ function enableRandomizeStrokeColorEvent()
 	}
 }
 
+function enableMuteAudioEvent()
+{
+	if (this.checked) {
+		if (enableMuteAudioChecked)
+			enableMuteAudioChecked = false;
+		else
+			enableMuteAudioChecked = true;
+	}
+}
 
 function restartDrawing(draw) {
-	sketch.clear();
+	draw.clear();
 	s = 0;
 	n = 0;
 }
 
 function pauseDrawing(draw) {
-	sketch.noLoop();
+	
+	if (draw.isLooping())
+	{
+		draw.noLoop();
+		console.log("Inside Pause");
+	}
 }
 
 function playDrawing(draw) {
-	sketch.loop();
+	
+	if (!draw.isLooping())
+	{
+		draw.loop();
+		console.log("Inside Play");
+	}
 }
 
 function resetCanvas() {

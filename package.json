@@ -1,0 +1,22 @@
+{
+  "name": "phyllotaxisanimator",
+  "version": "1.0.0",
+  "description": "whoa, trippy man",
+  "main": "phyllotaxis.js",
+  "scripts": {
+    "test": "is this thing on?"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sgrossm/PhyllotaxisAnimator.git"
+  },
+  "author": "Steve G",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/sgrossm/PhyllotaxisAnimator/issues"
+  },
+  "homepage": "https://github.com/sgrossm/PhyllotaxisAnimator#readme",
+  "dependencies": {
+    "tone": "^14.7.77"
+  }
+}
