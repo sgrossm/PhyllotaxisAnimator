@@ -20,7 +20,7 @@ let cSlider, stepSlider, loopSpeedSlider;
 let nodeXSlider, nodeYSlider, colorHueSlider;
 let colorSaturationSlider, colorBrightnessSlider;
 let strokeHueSlider, strokeSaturationSlider, strokeBrightnessSlider;
-let strokeWidthSlider;
+let strokeWidthSlider, volumeSlider;
 
 // Text 
 let textBgHue, textBgSaturation, textBgBrightness;
@@ -55,27 +55,24 @@ var resizeUIWidth, resizeUIHeight;
 let hasStarted = false;
 let img;	// Let users upload Image? // how do sound parameters affect sound?
 
-// Test
+// Testing
 var totalDrawCalls = 0;
 var totalShapesDrawn = 0;
 // need to cap graphics off at a certain level to avoid performance dedgradation
+var totalPlaySoundCalls = 0;
 
-
-// Sound - use TONE.JS
+// Sound 
+const audioData = JSON.parse(data);
 var isPlaying = false;
-var initVol = -6;
-var maxVol = 0;
-/*
-let volumeSlider; 	 
+var volumeSliderValue;
+var maxVol = -6;
+var maxBpm = 300;
+var vol, osc, bpm, delay; 
 
-var maxFreqHz = 20000;
-var minFreqHz = 50;
- var bpm = 120;
-var noteLength = 0.5; // default to eighth note
-var playLength = 1/(bpm/60) * noteLength; 
 // How graphics map to arpeggiator 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-//  							(ADSR?) (Gate?) (Slide?) (Octave?)
+//  							(ADSR?) (Gate?) (Slide?) (Octave?) (FM?) (Pitch Bend?)
+//								(Noise Osc?)
 //	Shape: 						osc type 
 //	Angle:						scale type
 //  Node Hue:					filter cutoff	
@@ -95,9 +92,8 @@ var playLength = 1/(bpm/60) * noteLength;
 //  X,Y coords???				start note? 
 //	Randomize Color:			random scale
 //	Randomize Outline: 			random filter position
-//  Image?
+//  Image?						sampler upload (provide defaults)
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-*/
 
 // Main drawing area 
 const SketchSystem = new p5( (drawing) => {
@@ -107,6 +103,7 @@ const SketchSystem = new p5( (drawing) => {
 		//img = drawing.loadImage("img/cat.png");
 		startButton = drawing.createButton("Start");
 		startButton.mousePressed(InitializeSoundSystem);
+
 		//img = drawing.loadImage("img/cat.png");
 /* 		if (enable3D)
 		{
@@ -133,16 +130,19 @@ const SketchSystem = new p5( (drawing) => {
 	};
 	
 	drawing.preload = () => {
-		//??? 
+		//??? this doesn't work
 		//img = drawing.loadImage("img/cat.png");
 	};
 	
 	drawing.draw = () => {
-		//if (drawing.frameCount % 2 == 0)
-		//{
-			var opt = false;
+		const totalStartTime = performance.now();			
+		let fps = drawing.frameRate();
+		let frameCount = drawing.frameCount;	
+		//console.log(`FPS: ${fps.toFixed(2)}, frame cnt: ${frameCount}`);		
+		
+		var opt = false;
 		if (hasStarted) {
-			const totalStartTime = performance.now();						
+						
 			drawing.translate(drawing.width / 2, drawing.height / 2); // 2D
 			//drawing.translate(drawing.width / 10, drawing.height / 10); // 3D
 			drawing.background(bgHue, bgSaturation, bgBrightness);
@@ -156,7 +156,10 @@ const SketchSystem = new p5( (drawing) => {
 			
 			//draw into an off-screen graphics buffer
 			// drawing.createGraphics 	
-			
+	
+	
+			// consolidate background/node color + saturation/brightness 
+			//into one slider?
 			stepSize 			= stepSlider.value(); 
 			nodeX 				= nodeXSlider.value();
 			nodeY 				= nodeYSlider.value();
@@ -172,24 +175,15 @@ const SketchSystem = new p5( (drawing) => {
 			strokeSaturation 	= strokeSaturationSlider.value();
 			strokeBrightness 	= strokeBrightnessSlider.value();
 			strokeWidth 		= strokeWidthSlider.value();
-
-
 			
-			/* stagger audio execution on a less frequent basis than visuals?
-			// use web workers to separate audio/visual threads? ?
-			// create list to hold previous arp notes ??
-			//var osc = AudioContext.createOscillator();
-			*/
-			if (drawing.frameCount % 5 == 0)
+			volumeSliderValue 	= volumeSlider.value();
+			if (frameCount % 5 == 0)
 			{	
 				PlaySound();
 			}		
 			
-			for (var i = 0; i <= n; i += stepSize)	// n gets really large, and I am redrawing everything
-			{	
-				// create new osc
-				//var oscNode = CreateOsc();
-				
+			for (var i = 0; i <= n; i += stepSize)	
+			{					
 				c = cSlider.value();
 				
 				var angle = i * gr;
@@ -199,37 +193,31 @@ const SketchSystem = new p5( (drawing) => {
 				
 				let fps = drawing.frameRate();
 				// use native js if performance is bad
-				if (fps < 10)
+				// this optimization causes jitter
+/* 				if (fps < 30)
 				{
 					r = c * drawing.sqrt(i);
 					x = r * Math.cos(angle);
 					y = r * Math.sin(angle);	
-					//totalShapesDrawn += 1;
-					let frameCount = drawing.frameCount;	
-					//console.log(`FPS: ${fps.toFixed(2)}, frame cnt: ${frameCount}`);
 					opt = true;
-				}
-					
-				else
-				{
+				} */				
+				//else
+				//{
 					r = c * drawing.sqrt(i);
 					x = r * drawing.cos(angle);
 					y = r * drawing.sin(angle);	
-					//totalShapesDrawn += 1;
-					let frameCount = drawing.frameCount;	
-					//console.log(`FPS: ${fps.toFixed(2)}, frame cnt: ${frameCount}`);
-				}
+				//}
 				
 				var shift = 0;
 				// experiment with this for more randomization options
-				if (fps < 10)
+/* 				if (fps < 10)
 				{
 					shift = Math.cos(s + i * 0.5);
-				}
-				else
-				{
+				} */
+				//else
+				//{
 					shift = drawing.cos(s + i * 0.5);
-				}
+				//}
 				shift = drawing.map(shift, -1, 1, 0, 360);
 
 				if (randomizeColorChecked) {
@@ -263,35 +251,26 @@ const SketchSystem = new p5( (drawing) => {
 
 				if (Math.abs(x) < Math.abs(drawing.width) || Math.abs(y) < Math.abs(drawing.height)) {
 					
-					//if (enable3D)
+					/*//if (enable3D)
 					//{
-						//let dirY = (drawing.mouseY / drawing.height - 0.5) *2;
-						//let dirX = (drawing.mouseX / drawing.width - 0.5) *2;	
-						//drawing.directionalLight(250, 250, 250, dirX, -dirY, 0.25);
-						//drawing.fill(colorShift, colorSaturation, colorBrightness);
-						//drawing.pointLight(colorShift, colorSaturation, colorBrightness, x, y, 0);
-						//drawing.sphere(nodeX, 10, 10);
-						//drawing.translate(x, y);
-						//drawing.rotateY(drawing.millis() / 1000);
-						//drawing.rotateX(drawing.millis() / 1000);
-						//drawing.rotateZ(drawing.millis() / 1000);
-					//}
+						let dirY = (drawing.mouseY / drawing.height - 0.5) *2;
+						let dirX = (drawing.mouseX / drawing.width - 0.5) *2;	
+						drawing.directionalLight(250, 250, 250, dirX, -dirY, 0.25);
+						drawing.fill(colorShift, colorSaturation, colorBrightness);
+						drawing.pointLight(colorShift, colorSaturation, colorBrightness, x, y, 0);
+						drawing.sphere(nodeX, 10, 10);
+						drawing.translate(x, y);
+						drawing.rotateY(drawing.millis() / 10000);
+						drawing.rotateX(drawing.millis() / 10000);
+						drawing.rotateZ(drawing.millis() / 10000); 
+					//} */
 					
 					if (enableEllipse)
 					{
 						
 						// lerpColor (gradient)
 						//drawing.updatePixels(x, y, 1, 1);
-						
 						drawing.ellipse(x, y, nodeX, nodeY);
-						//totalDrawCalls += 1;
-
-						/*						
-						osc.type = 'sine';
-						osc.frequency.setValueAtTime(440, AudioContext.currentTime);
-						osc.connect(AudioContext.destination);
-						osc.start(); 
-						*/
 					}
 					
 					if (enableSquare)
@@ -316,29 +295,31 @@ const SketchSystem = new p5( (drawing) => {
 					 -> resizing node size should resize image
 					 -> grey out randomize checkboxes when image enabled
 					 -> allow user to upload their own pictures? (limit file/image size)
+					 -> allow user to upload their own audio samples? (limit duration)
 				
+				*/				
+/* 				
+			img.resize(100, 100);
+				drawing.image(img, x - 80, y - 80);
+				drawing.rotateX(drawing.frameCount * 0.01);
+				drawing.rotateY(drawing.frameCount * 0.01);
+				drawing.rotateZ(drawing.frameCount * 0.01);
+				drawing.texture(img);
+				drawing.noStroke()
+				drawing.box(nodeX)
+				drawing.translate(x, y);
+				drawing.blend(img, x - 80, y - 80, 120, 120, x, y, 120, 120, DIFFERENCE);
 				*/
-				
-				//img.resize(100, 100);
-				//drawing.image(img, x - 80, y - 80);
-				//drawing.blend(img, x - 80, y - 80, 120, 120, x, y, 120, 120, DIFFERENCE);
-				
 			}
 			
 			n += loopSpeed;
-			s += 5;				// randomize color speed
-			gr += grStep;		// add button to turn off rotation
-			
-			//Testing
-			//totalDrawCount += 1;
-			//console.log(`n: ${n}, totalDrawCalls: ${totalDrawCalls}`);
-			const totalDuration = performance.now() - totalStartTime;
-			if (opt)
-			{
-				console.log(`Total drawing took: ${totalDuration}ms`);
-			}
-			//}
-		}
+			s += 10;				// randomize color speed
+			gr += grStep;		
+		}	
+		/*
+ 		const totalDuration = performance.now() - totalStartTime;
+		console.log(`Total drawing took: ${totalDuration}ms`); 
+		*/
 	};
 	
 });
@@ -399,65 +380,56 @@ const UISystem = new p5( (menu) => {
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-//		AUDIO HELPER FUNCTIONS																				 //
+//		AUDIO HELPER FUNCTIONS																		     //
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-function InitializeSoundSystem()
+async function InitializeSoundSystem()
 {
 	hasStarted 		= true;
 	isPlaying 		= true;
 	// set volume and default params
 	
-	Tone.start();
+	await Tone.start();
+	console.log("audio is ready");
 }
 
-function PlaySound()
+/*async*/ function PlaySound()
 {
 	// readFile 
-	var audioData = JSON.parse(data)
-	//audioData.major[2];
-	var cacheLoopSpeed = loopSpeed;
-	const osc = new Tone.Oscillator();
+	//var startOctIndex = 0;
+	//var startNoteIndex = 0;
+	//audioData.Octave4[startOctIndex]
+	//audioData.major[startNoteIndex];	
+	// loopSpeed = 0.001 - 100
+	bpm = MapToRange(loopSpeed, 0.001, 100, 60, 300);
+	vol = new Tone.Volume(volumeSliderValue).toDestination();
+	//delay = new Tone.Delay(0.5).toDestination();
+	osc = new Tone.Oscillator().connect(vol).toDestination();
+
 	// set osc type
 	if (enableEllipse)
 	{
 		osc.type = "sine1";
 	}
-	
 	else if (enableSquare)
 	{
 		osc.type = "square1";
-	}
-	
+	}	
 	else if (enableTri)
 	{
 		osc.type = "triangle1";
-	}
+	}	
 	
-	// else if sawtooth?
-	
-	// get note sequence
-	// c-> starting octave
+	if (!enableMuteAudioChecked) 
+	{
+		Tone.Transport.bpm.value = bpm;
+		Tone.Transport.timeSignature = 4;
+		osc.start(0).stop("+0.025");
+	}	
+}
 
-	synth = new Tone.Synth().toDestination();
-	synth.volume.value = initVol;
-	if (!enableMuteAudioChecked)
-	{	
-		const pattern = new Tone.Pattern((time, note) => {
-			synth.triggerAttackRelease(note, "4n");
-		}, ["C2", "D4", "E5", "A6"], "upDown");
-		pattern.interval = "8n";
-		pattern.loop = true;
-		
-		Tone.Transport.start();
-		pattern.start(0);
-/* 		console.log(`speed ${loopSpeed}`);
-		if (cacheLoopSpeed != loopSpeed)
-		{
-			Tone.Transport.bpm.rampTo(loopSpeed, 1);
-		}
-		synth.triggerAttackRelease("C4", "8n"); */
-	}
-	
+function MapToRange(val, inRangeMin, inRangeMax, outRangeMin, outRangeMax)
+{
+	return (val - inRangeMin) * (outRangeMax - outRangeMin) / (inRangeMax - inRangeMin) + outRangeMin;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -597,6 +569,10 @@ function createSliders(draw, h, w, rH, rW) {
 	strokeWidthSlider = draw.createSlider(0, 20, 1, 0);
 	strokeWidthSlider.style('width', '100px');
 	strokeWidthSlider.position(w, h + 146);
+	
+	volumeSlider = draw.createSlider(-90, -6, -12, 0);
+	volumeSlider.style('width', '100px');
+	volumeSlider.position(w + 600, h+ 20);
 }
 
 function drawText(draw, h, w)
